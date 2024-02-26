@@ -1,0 +1,1 @@
+用浏览器写javascript代码。
