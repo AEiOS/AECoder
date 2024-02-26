@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html>
+ <head>
+  <meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"/>
+  <title>AE CODER</title>
+  <script>
+   var aeDB = null;
+   var maxId = 2;
+   var variableArray = new Array();
+   var codeArray = new Array();
+      
+   function initDatabase(finish) {
+    aeDB = new Object();
+    aeDB.search = function(storeName, id, finish){
+     var request = aeDB.db.transaction(storeName, "readwrite").objectStore(storeName).get(id);
+     request.onerror = function(e) {
+      finish(false, e.currentTarget.error.message);
+     };
+     request.onsuccess = function(e) {
+      if (e.target.result != null) {
+       finish(true, e.target.result);
+      } else{
+       finish(false, "empty");
+      }
+     };
+    };
+    aeDB.searchArray = function(storeName, columnName, columnValue, finish) {
+     var request = aeDB.db.transaction(storeName, 'readwrite').objectStore(storeName).index(columnName).get(columnValue);
+     request.onerror = function(e){
+      finish(false, e.currentTarget.error.message);
+     };
+     request.onsuccess = function(e){
+      if (e.target.result.length > 0){
+       finish(true, e.target.result);
+      }else{
+       finish(false, "empty");
+      }
+     };
+    };
+    aeDB.store = function(storeName, object) {
+     var request = aeDB.db.transaction(storeName, 'readwrite').objectStore(storeName).put(object);
+     request.onerror = function(e) {alert("store fail: " + e.currentTarget.error.message);};
+     //request.onsuccess = function(e) {alert("store success: " + object.className + " " + object.id + " " + object.name + e);};
+    };
+    aeDB.delete = function(storeName, id) {
+     var request = aeDB.db.transaction(storeName, 'readwrite').objectStore(storeName).delete(id);
+     request.onerror = function(e) {alert("delete fail: " + e.currentTarget.error.message);};
+     //request.onsuccess = function(e) {alert("delete success: " + e);};
+    };
+       
+    const indexeddb = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB;
+    const request = indexeddb.open("aeCoderDB", 1);
+    request.onerror = function(e) {alert("open database fail: " + e.currentTarget.error.message);};
+    request.onsuccess=function(e){
+     aeDB.db = e.target.result;
+     finish();
+    }
+    request.onupgradeneeded = function(e){
+     var db=e.target.result;
+     if(!db.objectStoreNames.contains("AECode")){
+       db.createObjectStore("AECode", {keyPath: "id"});
+     }
+	 if(!db.objectStoreNames.contains("AEVariable")){
+	   db.createObjectStore("AEVariable", {keyPath: "id"});
+	 }
+    }
+   }
+   
+   function mainPage(){
+    var page = new Object();
+    page.show = function(){
+     var body = document.body;
+     body.innerHTML = "";
+     var button = document.createElement("button");
+     button.innerHTML = "clear";
+     body.appendChild(button);
+     button.onclick = function() {
+      if (window.confirm("delete all?")) {
+       deleteDatabase();
+      }
+     };
+	 button = document.createElement("button");
+	 button.innerHTML = "show all codes";
+	 body.appendChild(button);
+	 button.onclick = function(){
+	  //alert(allCodes());
+	  var page2 = showCodesPage();
+	  page2.setCodes(allCodes());
+	  // page2.setCodes(jsonStr());
+	  page2.show();
+	 };
+     button = document.createElement("button");
+     button.innerHTML = "test";
+     body.appendChild(button);
+     button.onclick = function(){
+      testPage();
+     };
+	 button = document.createElement("button");
+	 button.innerHTML = "add variable";
+	 body.appendChild(button);
+	 button.onclick = function(){
+	  var page2 = variablePage();
+	  var aeVariable = createVariable();
+	  maxId += 1;
+	  aeVariable.setId(maxId);
+	  page2.setVariable(aeVariable);
+	  aeVariable.store();
+	  variableArray.push(aeVariable);
+	  page2.show();
+	 };
+	 button = document.createElement("button");
+	 button.innerHTML = "add function";
+	 body.appendChild(button);
+	 button.onclick = function(){
+	  var page = functionPage();
+	  var aeCode = createCode();
+	  maxId += 1;
+	  aeCode.setId(maxId);
+	  page.setCode(aeCode);
+	  aeCode.store();
+	  codeArray.push(aeCode);
+	  page.show();
+	 };
+     body.appendChild(document.createElement("br"));
+	 var label = document.createElement("p");
+	 label.innerHTML = "varibales ";
+	 body.appendChild(label);
+	 for (var i = 0; i < variableArray.length; i++) {
+	  var aeVariable = variableArray[i];
+	  // if (i > 0) {
+	  // 	body.appendChild(document.createElement("br"));
+	  // }
+	  button = document.createElement("button");
+	  button.innerHTML = aeVariable.getContent();
+	  body.appendChild(button);
+	  button.aeVariable = aeVariable;
+	  button.onclick = function(){
+	    var page2 = variablePage();
+	    page2.setVariable(this.aeVariable);
+	    page2.show();
+	   };
+	 }
+	 label = document.createElement("p");
+	 label.innerHTML = "functions ";
+	 body.appendChild(label);
+     button = document.createElement("button");
+     button.innerHTML = "main function";
+     body.appendChild(button);
+     button.onclick = function(){
+      var page = mainFunctionPage();
+      page.show();
+     };
+	 for (var i = 0; i < codeArray.length; i++) {
+	  var aeCode = codeArray[i];
+	  if (aeCode.getId() != 2) {
+	   body.appendChild(document.createElement("br"));
+	   button = document.createElement("button");
+	   button.innerHTML = aeCode.getName();
+	   body.appendChild(button);
+	   button.aeCode = aeCode;
+	   button.onclick = function(){
+	    var page = functionPage();
+	    page.setCode(this.aeCode);
+	    page.show();
+	   };
+	  }
+	 }
+    };
+    return page;
+   }
+   
+   function showCodesPage(){
+    var page = new Object();
+    page.setCodes = function(code2) {
+        page.aeCodes = code2;
+    };
+    page.show = function(){
+	 var body = document.body;
+	 body.innerHTML = "";
+     var textView = document.createElement("textarea");
+     textView.value = page.aeCodes;
+     var button = document.createElement("button");
+     button.innerHTML = "back";
+     body.appendChild(button);
+     button.onclick = function() {
+      var page2 = mainPage();
+      page2.show();
+     };
+     body.appendChild(textView);
+     textView.style.height = "300px";
+     textView.style.width = "100%";
+	 
+	 button = document.createElement("button");
+	 button.innerHTML = "html";
+	 body.appendChild(button);
+	 button.onclick = function(){
+	  textView.value = allCodes();
+	 };
+	 button = document.createElement("button");
+	 button.innerHTML = "json";
+	 body.appendChild(button);
+	 button.onclick = function(){
+	  textView.value = jsonStr();
+	 };
+	 
+	 button = document.createElement("button");
+	 button.innerHTML = "store json";
+	 body.appendChild(button);
+	 button.onclick = function(){
+	  storeJsonIntoDB(textView.value);
+	 };
+    };
+	
+    return page;
+   }
+   
+   function mainFunctionPage(){
+    var aeCode = codeArray[0];
+    var page = functionPage();
+    page.setCode(aeCode);
+    return page;
+   }
+   
+   function functionPage(){
+    var page = new Object();
+    page.setCode = function(code2) {
+        page.aeCode = code2;
+    };
+    page.show = function(){
+     page.aeCode.search(function(isSuccess, result){
+      var body = document.body;
+      body.innerHTML = "";
+	  var textField = document.createElement("input");
+	  if (page.aeCode.name != null) {
+	  	textField.value = page.aeCode.name;
+	  } else {
+		textField.value = "input function name";
+	  }
+      var textView = document.createElement("textarea");
+      textView.value = page.aeCode.content;
+      var button = document.createElement("button");
+      button.innerHTML = "back";
+      body.appendChild(button);
+      button.onclick = function() {
+       var page2 = mainPage();
+       page2.show();
+      };
+	  if (page.aeCode.getId() != 2) {
+	   button = document.createElement("button");
+	   button.innerHTML = "delete";
+	   body.appendChild(button);
+	   button.onclick = function() {
+	    if (window.confirm("delete this function?")) {
+		 for (var i = 0; i < codeArray.length; i++) {
+		 	var aeCode = codeArray[i];
+			if (aeCode.getId() == page.aeCode.getId()) {
+				codeArray.splice(i, 1);
+				break;
+			}
+		 }
+		 page.aeCode.delete();
+	     var page2 = mainPage();
+	     page2.show();
+	    }
+	   };
+	  }
+      button = document.createElement("button");
+      button.innerHTML = "save";
+      body.appendChild(button);
+      button.onclick = function() {
+	   if (page.aeCode.getId() != 2) {
+	   	page.aeCode.setName(textField.value);
+	   }
+       var content = textView.value;
+       page.aeCode.setContent(content);
+       page.aeCode.store();
+      };
+	  if (page.aeCode.getId() != 2) {
+	   body.appendChild(textField);
+	  }
+      body.appendChild(textView);
+      textView.style.height = "300px";
+      textView.style.width = "100%";
+     });
+    };
+    return page;
+   }
+   
+   function variablePage(){
+    var page = new Object();
+    page.setVariable = function(aeVariable2) {
+        page.aeVariable = aeVariable2;
+    };
+    page.show = function(){
+     page.aeVariable.search(function(isSuccess, result){
+      var body = document.body;
+      body.innerHTML = "";
+   	  var textField = document.createElement("input");
+   	  if (page.aeVariable.getContent() != null) {
+   	  	textField.value = page.aeVariable.getContent();
+   	  } else {
+   		textField.value = "input variable";
+   	  }
+      var button = document.createElement("button");
+      button.innerHTML = "back";
+      body.appendChild(button);
+      button.onclick = function() {
+       var page2 = mainPage();
+       page2.show();
+      };
+   	  button = document.createElement("button");
+   	  button.innerHTML = "delete";
+   	  body.appendChild(button);
+   	  button.onclick = function() {
+   	    if (window.confirm("delete this variable?")) {
+   		 for (var i = 0; i < variableArray.length; i++) {
+   		 	var aeVariable = variableArray[i];
+   			if (aeVariable.getId() == page.aeVariable.getId()) {
+   				variableArray.splice(i, 1);
+   				break;
+   			}
+   		 }
+   		 page.aeVariable.delete();
+   	     var page2 = mainPage();
+   	     page2.show();
+   	    }
+   	   };
+      button = document.createElement("button");
+      button.innerHTML = "save";
+      body.appendChild(button);
+      button.onclick = function() {
+       page.aeVariable.setContent(textField.value);
+       page.aeVariable.store();
+      };
+   	  body.appendChild(textField);
+     });
+    };
+    return page;
+   }
+   
+   function deleteDatabase() {
+    aeDB.db.close();
+    const indexeddb = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB;
+    let deleteRequest = indexeddb.deleteDatabase("aeCoderDB");
+    deleteRequest.onerror = function(e){alert("delete database fail:" + e.currentTarget.error.message);};
+    deleteRequest.onsuccess = function(e){alert("delete database success:" + e);};
+   }
+   
+   function allCodes() {
+	   var content = "<!DOCTYPE html><html><head><meta charset=\"utf-8\" name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0\"/><title>test</title><script>";
+	   for (var i = 0; i < variableArray.length; i++) {
+	    var aeVariable = variableArray[i];
+	    content += "\nvar "; 
+	    content += aeVariable.getContent();
+	    content += ";";
+	   }
+	   for (var i = 0; i < codeArray.length; i++) {
+	    var aeCode = codeArray[i];
+	    if (aeCode.getId() == 2) {
+	     content += "\nwindow.onload = function() {";
+	     content += aeCode.getContent();
+	     content += "}";
+	    }else{
+		 content += "\nfunction "; 
+	     content += aeCode.getName();
+	     content += "{";
+	     content += aeCode.getContent();
+	     content += "\n}";	 
+	    }
+	   }
+	   content += "\n<\/script><\/head><body><\/body><\/html>";
+	   
+	   return content;
+   }
+   
+   function jsonStr() {
+	   var str = "{\"variables\":";
+	   str += JSON.stringify(variableArray);
+	   str += ",\"functions\":";
+	   str += JSON.stringify(codeArray);
+	   str += "}";
+	   return str;
+   }
+   
+   function storeJsonIntoDB(jsonStr) {
+	var js = JSON.parse(jsonStr);
+	var vs = js.variables;
+	for (var i = 0; i < vs.length; i++) {
+	 var aeVariable = createVariable();
+	 aeVariable.setId(vs[i].id);
+	 aeVariable.setContent(vs[i].content);
+	 aeVariable.store();
+	}
+	var fs = js.functions;
+	for (var i = 0; i < fs.length; i++) {
+	 var aeCode = createCode();
+	 aeCode.setId(fs[i].id);
+	 aeCode.setName(fs[i].name);
+	 aeCode.setContent(fs[i].content);
+	 aeCode.store();
+	 }
+   }
+      
+   function testPage() {
+    var w = window.open("", "_blank", "scrollbars=yes,resizable=1,modal=false,alwaysRaised=yes");
+    w.document.write(allCodes());
+    w.document.close();
+   }
+   
+   window.onload = function() {
+    initDatabase(function() {
+	 var request = aeDB.db.transaction("AECode", "readwrite").objectStore("AECode").getAll();
+	 request.onsuccess = function(e){
+	  if (e.target.result.length > 0){
+	   var array = e.target.result;
+	   for (var i = 0; i < array.length; i++) {
+	   	var aeCode = createCode();
+	    aeCode.setId(array[i].id);
+		aeCode.setName(array[i].name);
+		aeCode.setContent(array[i].content);
+		codeArray.push(aeCode);
+		if (aeCode.id > maxId) {
+		 maxId = aeCode.id;
+		}
+	   }
+	  }else{
+	   var aeCode = createCode();
+	   aeCode.setId(2);
+	   aeCode.setName("main function");
+	   aeCode.store();
+	   codeArray.push(aeCode);
+	   maxId = 2;
+	  }
+	  
+	  request = aeDB.db.transaction("AEVariable", "readwrite").objectStore("AEVariable").getAll();
+	  request.onsuccess = function(e){
+	   if (e.target.result.length > 0){
+	    var array = e.target.result;
+	    for (var i = 0; i < array.length; i++) {
+	     var aeVariable = createVariable();
+	     aeVariable.setId(array[i].id);
+	  	 aeVariable.setContent(array[i].content);
+	  	 variableArray.push(aeVariable);
+	  		if (aeVariable.id > maxId) {
+	  		 maxId = aeVariable.id;
+	  		}
+	    }
+	   }
+	   
+	   var page = mainPage();
+	   page.show();
+	  };
+	  request.onerror = function(e) {
+	   alert("init variable array fail!" + e.currentTarget.error.message);
+	  };
+	  
+	  // var page = mainPage();
+	  // page.show();
+	 };
+     request.onerror = function(e) {
+      alert("init code array fail!" + e.currentTarget.error.message);
+     };
+    });
+   }
+      
+   function createCode() {
+    var aeCode = new Object();
+    aeCode.getContent = function() {
+     return aeCode.content;
+    };
+    aeCode.setContent = function(content2) {
+     aeCode.content = content2;
+    };
+    aeCode.getName = function() {
+     return aeCode.name;
+    };
+    aeCode.setName = function(name2) {
+     aeCode.name = name2;
+    };
+    aeCode.getId = function() {
+     return aeCode.id;
+    };
+    aeCode.setId = function(id2) {
+     aeCode.id = id2;
+    };
+   
+    aeCode.search = function(finish) {
+     aeDB.search("AECode", aeCode.id, function(isSuccess, result) {
+      if (isSuccess && result.id > 0) {
+	   if (result.content != null) {
+	    aeCode.content = result.content;
+	   }
+       if (result.name != null) {
+       	aeCode.name = result.name;
+       }
+       finish(true, aeCode);
+      }else{
+       finish(false, result);
+      }
+     });
+    }
+    aeCode.store = function() {
+     aeDB.store("AECode", {id: aeCode.id, content: aeCode.content, name: aeCode.name});
+    }
+    aeCode.delete = function() {
+     aeDB.delete("AECode", aeCode.id);
+    }
+       
+    return aeCode;
+   }
+   
+   function createVariable() {
+    var aeVariable = new Object();
+    aeVariable.getContent = function() {
+     return aeVariable.content;
+    };
+    aeVariable.setContent = function(content2) {
+     aeVariable.content = content2;
+    };
+    aeVariable.getId = function() {
+     return aeVariable.id;
+    };
+    aeVariable.setId = function(id2) {
+     aeVariable.id = id2;
+    };
+	
+    aeVariable.search = function(finish) {
+     aeDB.search("AEVariable", aeVariable.id, function(isSuccess, result) {
+      if (isSuccess && result.id > 0) {
+   	   if (result.content != null) {
+   	    aeVariable.content = result.content;
+   	   }
+       finish(true, aeVariable);
+      }else{
+       finish(false, result);
+      }
+     });
+    }
+    aeVariable.store = function() {
+     aeDB.store("AEVariable", {id: aeVariable.id, content: aeVariable.content});
+    }
+    aeVariable.delete = function() {
+     aeDB.delete("AEVariable", aeVariable.id);
+    }
+	
+    return aeVariable;
+   }
+  </script>
+ </head>
+ <body>
+  
+ </body>
+</html>
